@@ -1,0 +1,673 @@
+---
+title: "Feature_table_analysis_C3_Tutorial"
+author: "Matthew Nitschke"
+date: "27 March 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. R intro
+
+Lets begin with a very brief introduction to the basics of the R statistical programming language
+
+https://en.wikipedia.org/wiki/R_(programming_language)
+
+## 1.0 R studio
+
+## 1.1 R markdown (RMD)
+
+The backtick `
+
+```{r}
+
+```
+
+```{r}
+# A hash before some code or text will prevent this line from being executed
+# And in most Integrated Development Environments (IDE), this text will appear as a different colour
+
+Everything outside the hash RStudio will exectute assuming it is R code
+```
+
+## 1.2 Code chunks with ctrl + alt + i
+
+```{r}
+
+```
+
+
+## 1.3 R as a calculator
+
+```{r}
+5 + 5
+
+5 - 5 
+
+3 * 5
+
+(5 + 5) / 2 
+
+2 ^ 5
+```
+
+## 1.4 Object oriented programming 
+
+Create a variable, then do something with it.
+
+The way we assign data to a variable in R is by using = or <-
+
+```{r}
+# Assign the value 42 to x
+x <- 50
+
+x
+
+x = 500
+
+x
+
+# Do some math with variable x
+x / 10
+```
+
+```{r}
+# Give your variables useful names
+days_week <- 7
+
+days_week
+```
+
+```{r}
+# Assign values to variables
+days_week  <- 7
+weeks_year <- 52.14286
+
+# Multiply these variables and store them in a new variable
+days_year <- days_week * weeks_year
+
+# Check the new variable
+days_year
+```
+
+## 1.5 Data classes
+
+```{r}
+a_number <- 42
+
+some_characters <- "bacteria"
+
+answer_to_a_question <- FALSE
+
+# Check class of each new variable with the class() function. Some new syntax!
+
+class(a_number)
+
+class(some_characters)
+
+class(answer_to_a_question)
+
+# Lets check what the class function does
+?class
+```
+
+## 1.6 Vector creation using c()
+ 
+```{r}
+?c
+
+numeric_vector <- c(1, 10, 49)
+
+character_vector <- c(dolphin, whale, manatee) # This doesnt work
+
+character_vector <- c("dolphin", "whale", "manatee") # This works
+
+boolean_vector <- c(TRUE, FALSE, TRUE)
+
+character_vector
+```
+
+## 1.7 Vector math
+
+```{r}
+sample_1 <- c(5, 10, 200)
+sample_2 <- c(5, 10, 200)
+sample_3 <- c(5, 10, 200)
+
+sample_1
+
+# Take the sum of each sample vector
+sample_sum <- sample_1 + sample_2 + sample_3
+
+# Print out sample_sum
+sample_sum
+
+# Use square brackets to refer to refer to position (index) in vector
+sample_sum_1 <- sample_1[1] + sample_2[2] + sample_3[3]
+
+sample_sum_1
+
+# Add 
+sum(sample_1, sample_2, sample_3)
+```
+
+## 1.8 Dataframes
+
+```{r}
+sample_dataframe <- data.frame(oak = sample_1, pine = sample_2, fern = sample_3)
+
+View(sample_dataframe)
+
+# Extract a column from the dataframe
+sample_dataframe$oak
+
+class(sample_dataframe$oak)
+
+sample_dataframe$type <- c("stem", "leaf", "root")
+
+class(sample_dataframe$type)
+
+sample_dataframe$question <- c(TRUE, FALSE, TRUE)
+
+class(sample_dataframe$question)
+```
+
+## --
+
+# 2. OTU/Feature table tutorial
+
+Useful hyperlinks for tutorial
+
+Phyloseq documentation and tutorials
+https://joey711.github.io/phyloseq/
+
+Full-stack data analysis (advanced)
+https://f1000research.com/articles/5-1492/v1
+
+## 2.0 Load packages
+
+Many of the packages below are part of the tidyverse https://www.tidyverse.org/
+
+```{r}
+# Load packages for plotting and being tidy
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(scales)
+library(purrr)
+library(tibble)
+
+# Load packages for analysing community data
+library(phyloseq)
+library(genefilter)
+library(vegan)
+library(DESeq2)
+```
+
+## 2.1 Importing data
+
+### 2.1.1 Biom format
+
+Biom format documentation
+http://biom-format.org/documentation/adding_metadata.html
+
+```{r}
+data <- import_biom("otu_table_clean_taxonomy_metadata.biom")
+
+data
+
+# Note: Qiime2 .biom files dont export taxonomy by default. Need to add manually.
+```
+
+### 2.1.2 Manual creation of phyloseq object
+
+```{r}
+# Load in feature table which is an OTU/Taxonomy table in one tsv file
+raw <- read.table("example_feature_table.txt", sep = "\t", header = TRUE)
+```
+
+```{r}
+# Create OTU table
+
+otutab <- raw
+rownames(otutab) <- raw$OTU.ID
+otutab <- otutab %>% select(-OTU.ID, -Taxon)
+otutab <- otu_table(otutab,  taxa_are_rows = TRUE)
+
+View(otutab)
+
+# Create a tidy taxonomy table
+
+taxtab <- data.frame(taxonomy = raw$Taxon)
+taxtab <- taxtab %>%
+  separate(taxonomy, into = c("k","p","c","o","f","g","s"), sep = ";", remove = TRUE)
+taxtab <- tax_table(taxtab)
+rownames(taxtab) <- rownames(otutab)
+colnames(taxtab) <- c("kingdom","phylum","class","order","family","genus","species")
+
+View(taxtab)
+
+# Create sample metadata
+
+samptab <- read.table("sample_metadata.txt", header = TRUE, sep = "\t")
+rownames(samptab) <- samptab$SampleID
+samptab <- sample_data(samptab)
+
+View(samptab)
+
+# Now unite otutab, taxtab, and samptab into the phyloseq() object
+
+ps <- phyloseq(otutab, taxtab, samptab)
+
+ps
+```
+
+Clear environment before moving forward
+
+```{r}
+rm(list=ls())
+```
+
+## 2.2 Exploring the tutorial data
+
+### 2.2.1 GlobalPatterns()
+
+Phyloseq has built-in tutorial data from published papers
+
+```{r}
+data("GlobalPatterns")
+
+?GlobalPatterns
+```
+
+### 2.2.2 First check the phyloseq primitives
+
+otu_table()
+tax_table()
+sample_data()
+phy_tree()
+
+```{r}
+GlobalPatterns
+
+View(sample_data(GlobalPatterns))
+
+# View(otu_table(GlobalPatterns))
+
+# View(tax_table(GlobalPatterns))
+
+# An extra slot in the phyloseq object we have not seen yet
+phy_tree(GlobalPatterns)
+
+# The labels of the phylogenetic tree leaves or "tips" must match the row names of the otutab or taxtab
+phy_tree(GlobalPatterns)
+head(rownames(tax_table(GlobalPatterns)))
+```
+
+### 2.2.3 Sequencing depth
+
+```{r}
+sample_sums(GlobalPatterns)
+
+max(sample_sums(GlobalPatterns))/min(sample_sums(GlobalPatterns))
+```
+
+## 2.3 Data wrangling
+
+Our dataset is too big for what I want to show you today
+
+Lets make it smaller
+
+```{r}
+# Call taxa_sums() within prune_taxa() and specify the minimum abundance
+?prune_taxa
+
+GP <- prune_taxa(taxa_sums(GlobalPatterns) > 50, GlobalPatterns)
+
+GlobalPatterns
+GP
+```
+
+### 2.2.1 Subsetting samples
+
+```{r}
+# Which samples do we want to analyse?
+View(sample_data(GP))
+
+# Lets get rid of human associated samples
+remove_list <- c("Feces", "Mock", "Skin", "Tongue")
+
+# Add a new sample variable that indicates which we want to remove
+sample_data(GP)$human <- get_variable(GP, "SampleType") %in% remove_list
+
+View(sample_data(GP))
+
+# Use the subset_samples function to keep those which have TRUE in the remove column
+GP_env <- subset_samples(GP, human == FALSE)
+
+View(sample_data(GP_env)) # Human samples have been removed
+View(otu_table(GP_env)) # They have also been removed from the otu table
+
+GP_env
+
+GP_env <- prune_taxa(taxa_sums(GP_env) > 0, GP_env) # We may have created OTUs with zero abundance after subsetting
+
+GP_env
+```
+
+### 2.2.2 Pruning taxa
+
+```{r}
+View(tax_table(GP_env))
+
+GP_env <- subset_taxa(GP_env, Kingdom != "Archaea")
+```
+
+## 2.3 Rarefaction curves
+
+Lets check our sequencing depth with rarefaction curves courtesy of phyloseq.extended
+https://github.com/mahendra-mariadassou/phyloseq-extended
+
+```{r}
+phyloseq.extended:::ggrare(GP_env, step = 1000, color = "SampleType", se = FALSE)
+
+# Lets do a test and see if our filtering of rare taxa has altered the rarefaction curve by going back to the original data
+test <- subset_samples(GlobalPatterns, SampleType == "Sediment (estuary)")
+phyloseq.extended:::ggrare(test, step = 1000, color = "SampleType", se = FALSE)
+```
+
+## 2.4 General visualisation
+
+### 2.4.1 Bar plots
+
+Use phyloseqs inbuilt barplot function to take a first look at the data
+
+```{r}
+plot_bar(GP_env, x = "Sample", y = "Abundance", fill = "Phylum")
+
+# All that green looks suspicious
+
+View(tax_table(GP_env))
+
+# Filter out what is probably organellar 16S from Eukaryotes
+
+GP_env <- subset_taxa(GP_env, Class != "Chloroplast")
+
+# A transformation to relative abundance would be useful for visualisation
+
+GP_env_t <- transform_sample_counts(GP_env, function(x) x/sum(x))
+
+plot_bar(GP_env_t, x = "Sample", y = "Abundance", fill = "Phylum")
+
+# Lets aggregate taxa according to taxonomic ranks
+
+glom <- tax_glom(GP_env_t, taxrank = "Phylum")
+
+plot_bar(glom, x = "Sample", y = "Abundance", fill = "Phylum")
+
+# Advanced plotting....
+
+long <- psmelt(glom)
+
+theme_set(theme_bw())
+
+ggplot(data = long, aes(x = Sample, y = Abundance)) +
+      geom_bar(stat = "identity", aes(fill = Phylum), colour = "black", position = "fill") + 
+      facet_wrap(~SampleType, scales = "free_x", nrow = 1) +
+      scale_y_continuous(labels = scales::percent) +
+      theme(aspect.ratio = 1, legend.position = "right", axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+      guides(fill = guide_legend(ncol = 3))
+```
+
+### 2.4.2 Heat maps
+
+Use the inbuilt phyloseq function to plot a heatmap
+
+```{r}
+glom <- tax_glom(GP_env, taxrank = "Class")
+
+glom <- transform_sample_counts(glom, function(x) x/sum(x))
+
+plot_heatmap(glom, "NMDS", "bray", low = "#000033", high = "#FF3300", taxa.label = "Class", sample.label = "SampleType", trans = identity_trans())
+
+# The default plotting is a log 4 transformation
+
+plot_heatmap(glom, "NMDS", "bray", low = "#000033", high = "#FF3300", taxa.label = "Class", sample.label = "SampleType")
+
+# What other types of ordination methods are available? Try RDA
+?ordinate
+```
+
+### 2.4.3 Phylogenetic trees
+
+Phyloseq also has a tree plotting function that can 
+
+```{r}
+plot_tree(glom, ladderize = "left", color = "Phylum", shape = "SampleType")
+
+# This type of plot is often subject to overplotting. Lets merge the samples by sampletype first.
+
+glom <- merge_samples(glom, "SampleType")
+sample_data(glom)$SampleType <- factor(sample_names(glom))
+
+# Replot the tree and try turning on tip labels
+
+plot_tree(glom, ladderize = "left", color = "Phylum", shape = "SampleType", label.tips = "Phylum") +
+  scale_shape_manual(values = c(15,16,17,18,19))
+```
+
+## 2.5 Alpha diversity
+
+```{r}
+plot_richness(GP_env, x = "SampleType", color = "SampleType") +
+  geom_point(size = 4) +
+  theme(aspect.ratio = 1)
+```
+
+```{r}
+# Set up loop parameters
+smallest <- min(sample_sums(GP_env))
+nsamp <- nsamples(GP_env)
+runs <- 10 # Do more with more time
+
+# Create empty matricies for each run of the loop
+
+InvSimpson <- matrix(nrow = nsamp, ncol = runs)
+row.names(InvSimpson) <- sample_names(GP_env)
+
+# Run rarefaction loop 10x and compute inverse simpson each time
+
+for (i in 1:runs) {
+   r <- rarefy_even_depth(GP_env, sample.size = smallest, verbose = FALSE, replace = TRUE)
+   invs <- as.numeric(as.matrix(estimate_richness(r, measures = "InvSimpson")))
+   InvSimpson[ ,i] <- invs
+}
+
+SampleID <- row.names(InvSimpson)
+mean <- apply(InvSimpson, 1, mean)
+sd <- apply(InvSimpson, 1, sd)
+measure <- rep("InvSimpson", nsamp)
+InvSimpson_stats <- data.frame(SampleID, mean, sd, measure)
+InvSimpson_stats <- left_join(InvSimpson_stats, sample_data(GP_env), by = c("SampleID" = "X.SampleID"))
+
+
+# Plot inverse simpson
+InvSimpson_stats %>%
+  ggplot(aes(x = SampleType, y = mean, fill = SampleType)) +
+              #facet_wrap(.~SampleType, scales = "free") +
+              geom_boxplot() +
+              theme(axis.text.x = element_text(angle = 90, hjust = 0.5)) +
+              theme(aspect.ratio = 1) +
+              ylab("Inverse Simpson")
+```
+
+## 2.6 Multivariate statistics
+
+### 2.6.1 Unconstrained ordination
+
+```{r}
+GP_env_t <- transform_sample_counts(GP_env, function(x) x/sum(x))
+bray <- ordinate(GP_env_t, "NMDS", "bray")
+unifrac <- ordinate(GP_env_t, "NMDS", "unifrac", weighted = TRUE)
+
+plot_ordination(GP_env_t, unifrac, color = "SampleType", shape = "SampleType")  + 
+  geom_text(aes(label = sample_names(GP_env_t)), vjust = 1.5) + 
+  geom_point(size = 4) +
+  scale_shape_manual(values = c(15,16,17,18,19))
+```
+
+```{r}
+po <- plot_ordination(GP_env_t, bray, type = "split", color = "Phylum", shape = "SampleType") +
+  geom_point(size = 3, aes(alpha = 0.6)) +
+  scale_shape_manual(values = c(16,16,15,17,18,19)) +
+  theme(aspect.ratio = 1)
+
+po$layers <- po$layers[-1]
+
+gg_color_hue <- function(n){
+    hues = seq(15, 450, length = n+1)
+    hcl(h = hues, l = 65, c = 100)[1:n]
+}
+
+color.names <- levels(po$data$Phylum)
+pocols <- gg_color_hue(length(color.names))
+names(pocols) <- color.names
+pocols["Samples"] <- "black"
+po + scale_color_manual(values = pocols)
+```
+
+### 2.6.2 Constrained ordination
+
+```{r}
+# Create some plausible data
+sample_data(GP_env_t)$pH <- c(6.5, 6.2, 6.1, 7.1, 7.2, 7.4, 7.45, 7.5, 8.1, 8.2, 8.15, 7.95, 7.98, 7.99)
+sample_data(GP_env_t)$TO <- c(5, 6, 9, 0.5, 0.6, 0.55, 0.8, 0.6, 2, 2.5, 3.1, 9, 8, 8.5)
+sample_data(GP_env_t)$P <- runif(14, 1.0, 20.0)
+
+View(sample_data(GP_env_t))
+
+constrained <- ordinate(GP_env_t, "CCA", "bray", formula = ~ pH + TO + P)
+
+arrowmat <- vegan::scores(constrained, display = "bp")
+arrowdf <- data.frame(labels = rownames(arrowmat), arrowmat)
+arrow_map <- aes(xend = CCA1, yend = CCA2, x = 0, y = 0, shape = NULL, color = NULL, label = labels)
+label_map <- aes(x = 1.2 * CCA1, y = 1.2 * CCA2, shape = NULL, color = NULL, label = labels)
+arrowhead = arrow(length = unit(0.02, "npc"))
+
+cap_plot <- plot_ordination(GP_env_t, constrained, color = "SampleType") + 
+  geom_text(aes(label = sample_names(GP_env_t)), vjust = 1.5) + 
+  geom_point(size = 4) +
+  scale_shape_manual(values = c(15,16,17,18,19))
+
+cap_plot + geom_segment(mapping = arrow_map, size = .5, data = arrowdf, color = "gray", arrow = arrowhead) + 
+  geom_text(mapping = label_map, size = 4, data = arrowdf, show.legend = FALSE)
+```
+
+### 2.6.3 PERMANOVA
+
+```{r}
+?adonis
+
+bray <- phyloseq::distance(GP_env_t, method = "bray")
+sampledf <- data.frame(sample_data(GP_env_t))
+
+adonis(bray ~ pH + TO + P, data = sampledf, method = "bray", permutations = 9999)
+```
+
+### 2.6.4 SIMPER
+
+```{r}
+?simper
+
+OTU <- as(otu_table(GP_env_t), "matrix")
+
+# transpose so we have the OTUs as columns
+if(taxa_are_rows(GP_env_t)){OTU <- t(OTU)}
+
+# Coerce the object to a data.frame
+OTUdf = as.data.frame(OTU)
+
+# running the simper analysis on the dataframe and the variable of interest "SampleType"
+simper <- simper(OTUdf, sampledf$SampleType, permutations = 1000)
+
+# summarizing the simper output 
+simptax <- as.data.frame(tax_table(GP_env_t)) %>%
+  tibble::rownames_to_column(var = "OTUID")
+simpsum <- map_dfr(simper, ~as.data.frame(.), .id = "comparison")
+simpsum <-  left_join(simpsum, simptax, by = c("species" = "OTUID"))
+
+# Plotting simper output: cumulative contributions of most influential families:
+simpsum %>%
+  group_by(Order) %>%
+  summarise(cumsum = sum(average)) %>%
+  filter(cumsum > 0.05) %>%
+  drop_na() %>%
+  ggplot(aes(x = reorder(Order, -cumsum), y = cumsum)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(), aspect.ratio = 1, axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+```
+
+## 2.7 Differential abundance
+
+When perfoming many multiple comparisons (i.e. hundreds of t-tests) we must correct for erroneous inferences (false+)
+
+https://bioconductor.org/packages/release/bioc/html/DESeq2.html
+https://genomebiology.biomedcentral.com/articles/10.1186/s13059-014-0550-8
+
+```{r}
+alpha <- 0.05
+
+glom <- tax_glom(GP_env, taxrank = "Order") # We must use the RAW count data. Cannot be transformed.
+
+restax <- as.data.frame(tax_table(glom))
+restax <- rownames_to_column(restax, var = "OTUID")
+
+deseq <- phyloseq_to_deseq2(glom, ~ SampleType)
+deseq <- DESeq(deseq, test = "Wald", fitType = "parametric")
+
+diff_abund <- results(deseq, cooksCutoff = FALSE, contrast = c("SampleType", "Soil", "Ocean"), tidy = TRUE) %>%
+  filter(padj < alpha) %>%
+  left_join(., restax, by = c("row" = "OTUID")) %>%
+  mutate(test = "Soil_Ocean")
+
+diff_abund %>%
+ggplot(aes(x = log2FoldChange, y = reorder(Order, log2FoldChange))) + 
+      geom_errorbarh(aes(xmin = log2FoldChange + lfcSE, xmax = log2FoldChange - lfcSE), height = 0.1, colour = "black") +
+      geom_point(size = 2, shape = 21, fill = "white") +
+      geom_vline(xintercept = 0) +
+      theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5))
+
+# The column log2FoldChange is the effect size estimate (it is the multiplicative factor of A v B)
+
+A_v_B <- 10
+
+2^A_v_B
+
+A_v_B <- -5
+
+2^A_v_B
+
+100 * 2^A_v_B
+```
+
+# ---
+
+# Extra
+
+## Core microbiome
+
+Filter dataset to remove an OTU if it is not present in all samples.
+
+```{r}
+n <- length(sample_names(GP_env))
+filterfunction <- filterfun(kOverA(n, 0))
+keep_list <- filter_taxa(GP_env, filterfunction)
+core <- prune_taxa(keep_list, GP_env)
+
+GP_env
+core
+
+View(tax_table(core))
+```
