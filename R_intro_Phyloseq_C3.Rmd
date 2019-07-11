@@ -442,7 +442,7 @@ plot_heatmap(glom, "NMDS", "bray", low = "#000033", high = "#FF3300", taxa.label
 
 ### 2.4.3 Phylogenetic trees
 
-Phyloseq also has a tree plotting function that can 
+Phyloseq also has a tree plotting function 
 
 ```{r}
 plot_tree(glom, ladderize = "left", color = "Phylum", shape = "SampleType")
